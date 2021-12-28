@@ -1,18 +1,21 @@
 #! /usr/bin/env python3
 """
-usage: mask-consensus [-h] [--mincov INT] [--version]
-                      SAMPLE REFERENCE SUBS_FASTA SUBS_VCF COVERAGE
-mask-consensus - Snippy consensus (subs) with coverage masking.
+usage: rhea [-h] [--min_cov INT] [--min_spike_cov INT] [--width INT] [--version] SAMPLE FASTA VCF BAM
+
+rhea (v0.0.1) - Snippy consensus (subs) with coverage masking.
+
 positional arguments:
-  SAMPLE        Sample name
-  REFERENCE     Reference name
-  SUBS_FASTA    Input "consensus.subs.fa" FASTA file
-  SUBS_VCF      Input ".subs.vcf" VCF file
-  COVERAGE      Per-base coverage of alignment
+  SAMPLE               Sample name to use for naming outputs
+  FASTA                Consensus assembly in FASTA format
+  VCF                  VCF file from the consensus assembly
+  BAM                  Per-base coverage of alignment
+
 optional arguments:
-  -h, --help    show this help message and exit
-  --mincov INT  Minimum required coverage to not mask.
-  --version     show program's version number and exit
+  -h, --help           show this help message and exit
+  --min_cov INT        Minimum required coverage to not mask.
+  --min_spike_cov INT  For SARS-CoV-2 genomes, the minimum required coverage of Spike region.
+  --width INT          Maximum line length for FASTA output (Default: 80, use 0 to print to a single line)
+  --version            show program's version number and exit
 """
 PROGRAM = "rhea"
 VERSION = "0.0.1"
