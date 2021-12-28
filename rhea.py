@@ -8,7 +8,7 @@ positional arguments:
   SAMPLE               Sample name to use for naming outputs
   FASTA                Consensus assembly in FASTA format
   VCF                  VCF file from the consensus assembly
-  BAM                  Per-base coverage of alignment
+  BAM                  BAM file used to create consensus assembly
 
 optional arguments:
   -h, --help           show this help message and exit
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('vcf', metavar="VCF", type=str,
                         help='VCF file from the consensus assembly')
     parser.add_argument('bam', metavar="BAM", type=str,
-                        help='Per-base coverage of alignment')
+                        help='BAM file used to create consensus assembly')
     parser.add_argument('--min_cov', metavar='INT', type=int, default=50,
                         help='Minimum required coverage to not mask.')
     parser.add_argument('--min_sgene_cov', metavar='INT', type=int, default=100,

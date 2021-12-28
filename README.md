@@ -10,6 +10,7 @@ The standard practice for assembling SARS-CoV-2 genomes is to align the sequence
 conda create -n rhea -c conda-forge -c bioconda rhea
 ```
 
+Temporary installation:
 ```
 # Conda installation
 mamba create -n rhea -c conda-forge -c bioconda biopython pysam 'python>3.6' pyvcf
@@ -21,7 +22,7 @@ In order to use *rhea* you must provide a few inputs:
 1. The sample name used for naming outputs
 2. Consensus assembly in FASTA format
 3. VCF file containing any mutations observed
-4. THe BAM file containing read alignments to the make consensus calls
+4. The BAM file containing read alignments to the make consensus calls
 
 ### Usage
 ```
@@ -33,7 +34,7 @@ positional arguments:
   SAMPLE               Sample name to use for naming outputs
   FASTA                Consensus assembly in FASTA format
   VCF                  VCF file from the consensus assembly
-  BAM                  Per-base coverage of alignment
+  BAM                  BAM file used to create consensus assembly
 
 optional arguments:
   -h, --help           show this help message and exit
