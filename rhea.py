@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 """
-usage: rhea [-h] [--min_cov INT] [--min_spike_cov INT] [--width INT] [--version] SAMPLE FASTA VCF BAM
+usage: rhea [-h] [--min_cov INT] [--min_sgene_cov INT] [--width INT] [--outdir STR] [--debug] [--version] SAMPLE FASTA VCF BAM
 
-rhea (v0.0.1) - Snippy consensus (subs) with coverage masking.
+rhea (v0.0.1) - SARS-CoV-2 consensus assembly quality checks and corrections
 
 positional arguments:
   SAMPLE               Sample name to use for naming outputs
@@ -13,8 +13,10 @@ positional arguments:
 optional arguments:
   -h, --help           show this help message and exit
   --min_cov INT        Minimum required coverage to not mask.
-  --min_spike_cov INT  For SARS-CoV-2 genomes, the minimum required coverage of Spike region.
-  --width INT          Maximum line length for FASTA output (Default: 80, use 0 to print to a single line)
+  --min_sgene_cov INT  The minimum required coverage of S gene (Spike) region.
+  --width INT          Maximum line length for FASTA output (Default: 60, use 0 to print to a single line)
+  --outdir STR         Directory to write output. (Default ./)
+  --debug              Print full notes for every position (Default: only print changes
   --version            show program's version number and exit
 """
 PROGRAM = "rhea"
