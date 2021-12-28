@@ -19,6 +19,10 @@ optional arguments:
 """
 PROGRAM = "rhea"
 VERSION = "0.0.1"
+# Taken from https://www.ncbi.nlm.nih.gov/nuccore/MN908947.3
+SC2_GENOME_SIZE=29903
+SPIKE_START=21563
+SPIKE_STOP=25384
 import sys
 from collections import OrderedDict
 
@@ -39,7 +43,6 @@ def get_per_base_coverage(coverage):
         depth = row.nsegments
         coverages[reference][pos] = depth
     return coverages
-
 
 def read_vcf(vcf):
     """Get positions with a substitution."""
