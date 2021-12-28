@@ -77,13 +77,13 @@ The `txt` file output by *rhea* includes information about any maskings that mig
 
 ```
 position        coverage        observed_base   masked_base     note
-21563   190     A       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
-21564   190     T       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
-21565   190     G       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
-21566   190     T       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
-21567   190     T       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
-21568   190     T       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
-21569   190     G       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
+21563   90     A       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
+21564   90     T       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
+21565   90     G       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
+21566   90     T       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
+21567   90     T       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
+21568   90     T       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
+21569   90     G       N       Position did not meet the S gene coverage requirement, masking. (Observed 90x, Expected 100x)
 ```
 
 You can use `--debug` to print out details for every position.
