@@ -19,89 +19,197 @@ optional arguments:
 """
 PROGRAM = "rhea"
 VERSION = "0.0.1"
+
 # Taken from https://www.ncbi.nlm.nih.gov/nuccore/MN908947.3
+SC2_REFERENCE="MN908947.3"
 SC2_GENOME_SIZE=29903
-SPIKE_START=21563
-SPIKE_STOP=25384
+SC2_SGENE_START=21563
+SC2_SGENE_STOP=25384
 import sys
 from collections import OrderedDict
 
-def default_counts(name, length):
+def default_counts(length: int) -> dict:
+    """
+    Generate a dictionary with each position set to 0 coverage
+
+    Args:
+        length (int): The number of positions to set to 0 coverage
+
+    Returns:
+        dict: Keys are reference position with the value set to 0 (e.g. dict['42'] -> 0)
+    """
     counts = OrderedDict()
     for i in range(length):
+        # range is 0-based (e.g. range(3) -> [0,1,2,3]), so add 1 to get reference position
         counts[str(i + 1)] = 0
-    return {name: counts}
+    return counts
 
-def get_per_base_coverage(coverage):
-    """Extract per-base coverage from the BAM file"""
+def read_bam(bam_file: str) -> dict:
+    """
+    Extract per-base coverage from the BAM file.
+
+    Args:
+        bam_file (string): Path to the input BAM file
+
+    Returns:
+        dict: Keys are reference position with the value set to observed coverage (e.g. dict['42'] -> 777)
+    """
     import pysam
-    bamfile = pysam.AlignmentFile(coverage, 'rb')
-    reference = bamfile.references[0]
-    coverages = default_counts(reference, bamfile.get_reference_length(reference))
-    for row in bamfile.pileup(max_depth=0, stepper='nofilter'):
-        pos = str(row.reference_pos + 1)
-        depth = row.nsegments
-        coverages[reference][pos] = depth
+    bam = pysam.AlignmentFile(bam_file, 'rb')
+
+    # `pileup()` only outputs positions with coverage, so preset all positions to 0 coverage
+    coverages = default_counts(bam.get_reference_length(SC2_REFERENCE))
+
+    # Docs: https://pysam.readthedocs.io/en/latest/api.html#pysam.AlignmentFile.pileup
+    for pileupcolumn in bam.pileup(max_depth=0, stepper='nofilter'):
+        # Update with observed coverage, 'reference_pos' is 0-based, so add 1
+        # Docs: https://pysam.readthedocs.io/en/latest/api.html#pysam.PileupColumn
+        coverages[str(pileupcolumn.reference_pos + 1)] = pileupcolumn.nsegments
     return coverages
 
-def read_vcf(vcf):
-    """Get positions with a substitution."""
-    subs = {}
-    with open(vcf, 'rt') as vcf_fh:
-        for line in vcf_fh:
-            if not line.startswith("#"):
-                line = line.split('\t')
-                # 0 = accession, 1 = position
-                if line[0] not in subs:
-                    subs[line[0]] = {}
-                subs[line[0]][line[1]] = True
-    return subs
+def read_vcf(vcf_file: str) -> dict:
+    """
+    Read VCF file with observed mutations against the reference
 
+    Args:
+        vcf_file (string): Path to the input BAM file
 
-def read_fasta(fasta):
-    """Parse the input FASTA file."""
+    Returns:
+        dict: Keys are reference position with the value set to VCF entry
+    """
+    import vcf
+    records = OrderedDict()
+    with open(vcf_file, 'r') as vcf_fh:
+        for record in vcf.Reader(vcf_fh):
+            records[str(record.POS)] = record
+    return records
+
+def read_fasta(fasta_file: str) -> dict:
+    """
+    Read FASTA formatted consensus assembly
+
+    Args:
+        fasta_file (string): Path to the input FASTA file
+
+    Returns:
+        dict: Keys are reference position with the value set to the observed nucleotide
+    """
     from Bio import SeqIO
-    seqs = {}
-    with open(fasta, 'r') as fasta_fh:
+    seqs = []
+
+    with open(fasta_file, 'r') as fasta_fh:
         for record in SeqIO.parse(fasta_fh,'fasta'):
-            seqs[record.name] = str(record.seq)
-    return seqs
+            seqs.append(str(record.seq))
+
+    # Run checks
+    if len(seqs) == 0:
+        # Expect single contig consensus assembly, found empty FASTA
+        print(f"ERROR: Please verify input consensus assembly ({fasta_file}) is not empty", file=sys.stderr)
+        sys.exit(2)
+    elif len(seqs) > 1:
+        # Expect single contig consensus assembly, found multiple FASTA entries
+        print(f"ERROR: Input FASTA consensus assembly has multiple entries (found {len(seqs)} entries), expected only 1)",
+              file=sys.stderr)
+        sys.exit(2)
+    elif len(seqs[0]) != SC2_GENOME_SIZE:
+        # consensus assembly not equal to the expected length
+        print(f"ERROR: Input consensus assembly has a length of {len(seqs[0])} bp, expected {SC2_GENOME_SIZE} bp",
+              file=sys.stderr)
+        sys.exit(2)
+    else:
+        # Basic checks passed, convert to per-base dict
+        consensus = OrderedDict()
+        for i, base in enumerate(seqs[0]):
+            # enumerate is 0 based, add 1
+            consensus[str(i + 1)] = base
+        return consensus
 
 
-def mask_sequence(sequence, coverages, subs, mincov):
-    """Mask positions with low or no coverage in the input FASTA."""
-    masked_seqs = {}
-    
-    for reference, vals in coverages.items():
-        bases = []
-        for pos, cov in vals.items():
-            if cov >= mincov:
-                # Passes
-                if reference in subs:
-                    if str(pos) in subs[reference]:
-                        # Substitution
-                        bases.append(sequence[reference][pos].lower())
-                    else:
-                        # Same as reference
-                        bases.append(sequence[reference][pos])
-                else:
-                    # No SNPs, Same as reference
-                    bases.append(sequence[reference][pos])
-            elif cov:
-                # Low coverage
-                bases.append("N")
-            else:
-                # 0 coverage
-                bases.append('n')
+def check_consensus(consensus: dict, coverages: dict, mutations: dict, min_cov: int, min_sgene_cov: int) -> dict:
+    """
+    Mask positions with low or no coverage in the input FASTA.
 
-        if len(bases) != len(sequence[reference]):
-            print(f'Masked sequence ({len(bases)} for {reference} not expected length ({len(sequence[reference])}).',
-                file=sys.stderr)
-            sys.exit(1)
+    Args:
+        consensus (dict): Consensus assembly sequence
+        coverages (dict): Per-base coverage of the consensus assembly
+        mutations (dict): Mutations present in the input VCF file
+        min_cov (int): The minimum coverage, coverages below will be masked.
+        min_sgene_cove: The minimum coverage of S gene (Spike) region, coverages below will be masked.
+
+    Returns:
+        dict: Keys are reference positions with the value set to masked bases with notes
+    """
+    masked_consensus = OrderedDict()
+    masked_sequence = []
+    has_reference_inclusions = False
+    for pos, base in consensus.items():
+        cov = coverages[pos]
+        passed = True
+
+        if cov == 0 and base.lower() != 'n':
+            # Reference base was included, warn the user
+            passed = False
+            masked_consensus[pos] = {
+                'observed_base': base,
+                'masked_base': 'N',
+                'coverage': cov,
+                'note': f'WARNING: Potential reference base inclusion. Observed {base} with 0x coverage at this position.',
+                'passed': passed
+            }
+            print(f'WARNING: Potential reference base inclusion. Observed {base} with 0 coverage at position {pos}.', file=sys.stderr)
+        elif cov > 0 and base.lower() == 'n':
+            passed = False
+            masked_consensus[pos] = {
+                'observed_base': base,
+                'masked_base': base,
+                'coverage': cov,
+                'note': f'WARNING: Potential reference base inclusion. Observed {base} with {cov}x coverage at this position.',
+                'passed': passed
+            }
         else:
-            masked_seqs[reference] = bases
+            if int(pos) >= SC2_SGENE_START and int(pos) <= SC2_SGENE_STOP:
+                # In the S gene region, use S gene-specific coverage cutoff, exclude bases already masked (N)
+                if cov < min_sgene_cov and base.lower() != 'n':
+                    passed = False
+                    masked_consensus[pos] = {
+                        'observed_base': base,
+                        'masked_base': 'N',
+                        'coverage': cov, 
+                        'note': f'Position did not meet the S gene coverage requirement, masking. (Observed {cov}x, Expected {min_sgene_cov}x)',
+                        'passed': passed
+                    }
+            else:
+                # Use standard coverage cutoff, exclude bases already masked (N)
+                if cov < min_cov and base.lower() != 'n':
+                    passed = False
+                    masked_consensus[pos] = {
+                        'observed_base': base,
+                        'masked_base': 'N',
+                        'coverage': cov,
+                        'note': f'Position did not meet the coverage requirement, masking. (Observed {cov}x, Expected {min_cov}x)',
+                        'passed': passed
+                    }
+        
+        if passed:
+            # Everything passed, used the observed base
+            masked_consensus[pos] = {
+                'observed_base': base,
+                'masked_base': base,
+                'coverage': cov,
+                'note': f'',
+                'passed': passed
+            }
+        
+        # Rebuild the consensus
+        masked_sequence.append(masked_consensus[pos]['masked_base'])
 
-    return masked_seqs
+    # Make sure consensus lengths match
+    if len(masked_sequence) != SC2_GENOME_SIZE:
+        # Masked consensus assembly not equal to the expected length
+        print(f"ERROR: Masked consensus assembly has a length of {len(masked_sequence)} bp, expected {SC2_GENOME_SIZE} bp",
+            file=sys.stderr)
+        sys.exit(3)
+    return [masked_consensus, "".join(masked_sequence)]
 
 
 def format_header(sample, reference, accession, length):
@@ -127,7 +235,7 @@ if __name__ == '__main__':
         prog=PROGRAM,
         conflict_handler='resolve',
         description=(
-            f'{PROGRAM} (v{VERSION}) - Snippy consensus (subs) with coverage masking.'
+            f'{PROGRAM} (v{VERSION}) - SARS-CoV-2 consensus assembly quality checks and corrections'
         )
     )
     parser.add_argument('sample', metavar="SAMPLE", type=str,
@@ -140,10 +248,14 @@ if __name__ == '__main__':
                         help='Per-base coverage of alignment')
     parser.add_argument('--min_cov', metavar='INT', type=int, default=50,
                         help='Minimum required coverage to not mask.')
-    parser.add_argument('--min_spike_cov', metavar='INT', type=int, default=100,
-                        help='For SARS-CoV-2 genomes, the minimum required coverage of Spike region.')
-    parser.add_argument('--width', metavar='INT', type=int, default=80,
-                        help='Maximum line length for FASTA output (Default: 80, use 0 to print to a single line)')            
+    parser.add_argument('--min_sgene_cov', metavar='INT', type=int, default=100,
+                        help='The minimum required coverage of S gene (Spike) region.')
+    parser.add_argument('--width', metavar='INT', type=int, default=60,
+                        help='Maximum line length for FASTA output (Default: 60, use 0 to print to a single line)')
+    parser.add_argument('--outdir', metavar="STR", type=str, default="./",
+                        help='Directory to write output. (Default ./)')
+    parser.add_argument('--debug', action='store_true',
+                        help='Print full notes for every position (Default: only print changes')
     parser.add_argument('--version', action='version',
                         version=f'{PROGRAM} {VERSION}')
 
@@ -153,15 +265,27 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    coverages = get_per_base_coverage(args.bam)
-    sub_positions = read_vcf(args.vcf)
-    seqs = read_fasta(args.fasta)
-    masked_seqs = mask_sequence(seqs, coverages, sub_positions, args.min_cov)
-    for accession, seq in masked_seqs.items():
-        header = format_header(args.sample, args.reference, accession, len(seq))
-        print(header)
+    # Read inputs: BAM file (per-base coverages), VCF (mutations), FASTA (consensus assembly)
+    coverages = read_bam(args.bam)
+    mutations = read_vcf(args.vcf)
+    consensus = read_fasta(args.fasta)
+
+    # Check the consensus, mask low coverages, warn reference inclusions
+    masked_details, masked_consensus = check_consensus(consensus, coverages, mutations, args.min_cov, max(args.min_cov, args.min_sgene_cov))
+
+    # Write any details regarding masking
+    with open(f'{args.outdir}/{args.sample}-rhea.txt', 'wt') as rhea_txt:
+        rhea_txt.write(f'position\tcoverage\tobserved_base\tmasked_base\tnote\n')
+        for pos, vals in masked_details.items():
+            if args.debug or vals['passed'] == False:
+                rhea_txt.write(f'{pos}\t{vals["coverage"]}\t{vals["observed_base"]}\t{vals["masked_base"]}\t{vals["note"]}\n')
+
+    # Write the final masked sequenced
+    with open(f'{args.outdir}/{args.sample}-rhea.fasta', 'wt') as rhea_fasta:
+        rhea_fasta.write(f'>{args.sample} SARS-CoV-2 consensus assembly with masking by Rhea [assembly_accession={SC2_REFERENCE}] [length={len(masked_consensus)}]\n')
         if args.width:
-            for chunk in chunks(seq, args.width):
-                print("".join(chunk))
+            for chunk in chunks(masked_consensus, args.width):
+                seq = "".join(chunk)
+                rhea_fasta.write(f'{seq}\n')
         else:
-            print(seq)
+            rhea_fasta.write(f'{masked_consensus}\n')
