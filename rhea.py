@@ -159,13 +159,14 @@ def check_consensus(consensus: dict, coverages: dict, mutations: dict, min_cov: 
                 'passed': passed
             }
             print(f'WARNING: Potential reference base inclusion. Observed {base} with 0 coverage at position {pos}.', file=sys.stderr)
-        elif cov > 0 and base.lower() == 'n':
+        elif cov > min_cov and base.lower() == 'n':
+            # ambiguous nucleotide, but has good coverage
             passed = False
             masked_consensus[pos] = {
                 'observed_base': base,
                 'masked_base': base,
                 'coverage': cov,
-                'note': f'WARNING: Potential reference base inclusion. Observed {base} with {cov}x coverage at this position.',
+                'note': f'WARNING: Observed {base} with {cov}x coverage at this position. This exceeds the minimum coverage cutoff ({min_cov}x)',
                 'passed': passed
             }
         else:
