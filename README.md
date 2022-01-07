@@ -4,11 +4,7 @@
 The standard practice for assembling SARS-CoV-2 genomes is to align the sequenced reads to a reference genome ([MN908947.3](https://www.ncbi.nlm.nih.gov/nuccore/MN908947.3)) to create a consensus assembly. In most cases a satisfactory consensus assembly is created, but its often difficult to determine what thresholds were used in the creation of the consensus. *rhea* allows you standardize your consensus assemblies across multiple assemblers. With *rhea* you can set your own coverage cutoffs for sequence masking and identify instances where the reference base was included when it shouldn't have been.
 
 ## Installation
-*rhea* is available from Bioconda
-
-```
-conda create -n rhea -c conda-forge -c bioconda rhea
-```
+*rhea* will be available from Bioconda upon initial release
 
 Temporary installation:
 ```
